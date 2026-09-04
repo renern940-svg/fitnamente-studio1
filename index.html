@@ -1,104 +1,45 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#111827">
-  <title>Fitnamente Studio</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fitnamente Studio — Template</title><link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><div class="logo-mark">F</div><div><strong>FITNAMENTE</strong><span>STUDIO</span></div></div>
-    <a class="help" href="#como-usar">Como usar</a>
-  </header>
+<header><div class="brand"><b>FITNAMENTE</b><span>STUDIO</span></div><span class="local">PROCESSAMENTO LOCAL</span></header>
+<main>
+<section class="intro"><div><small>EDITOR DE TEMPLATES</small><h1>Use qualquer template e coloque o vídeo na área central.</h1><p>Envie sua arte, marque onde o vídeo deve ficar e depois aplique o mesmo template a vários vídeos.</p></div></section>
 
-  <main class="container">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">ESTÚDIO DE VÍDEOS</p>
-        <h1>Transforme vários vídeos em conteúdos prontos.</h1>
-        <p class="sub">Envie seus vídeos, escolha o template e gere tudo em sequência. O processamento acontece no seu navegador.</p>
-      </div>
-      <div class="badge">100% local</div>
-    </section>
+<section class="layout">
+<div class="panel">
+<h2>1. Template</h2>
+<label class="upload" for="templateFile"><input id="templateFile" type="file" accept="image/*"><strong>＋ Escolher imagem do template</strong><span>PNG, JPG ou WebP</span></label>
+<div class="stage-wrap"><div id="stage" class="stage"><img id="templatePreview"><div id="videoBox" class="video-box"><span>ÁREA DO VÍDEO</span><div class="handle"></div></div></div></div>
+<div class="controls">
+<button id="center" class="secondary">Centralizar área</button>
+<button id="fitWidth" class="secondary">Ajustar largura</button>
+</div>
+<p class="tip">Arraste o quadro para escolher onde o vídeo entra. Use o canto inferior direito para redimensionar.</p>
+</div>
 
-    <section class="grid">
-      <div class="panel">
-        <div class="panel-head"><h2>1. Seus vídeos</h2><span id="count">0 vídeos</span></div>
-        <label class="dropzone" id="dropzone" for="files">
-          <input id="files" type="file" accept="video/*" multiple hidden>
-          <div class="upload-icon">＋</div>
-          <strong>Adicionar vídeos</strong>
-          <span>MP4, MOV, WebM e outros formatos suportados pelo navegador</span>
-        </label>
-        <div id="fileList" class="file-list"></div>
-      </div>
+<div class="panel">
+<h2>2. Vídeos</h2>
+<label class="upload" for="videoFiles"><input id="videoFiles" type="file" accept="video/*" multiple><strong>＋ Adicionar vídeos</strong><span>Você pode selecionar vários de uma vez</span></label>
+<div id="files" class="files"></div>
 
-      <div class="panel">
-        <div class="panel-head"><h2>2. Template</h2></div>
-        <div class="templates">
-          <button class="template active" data-template="clean">
-            <div class="mini clean-mini"><span>FITNAMENTE</span><i>seu vídeo</i></div>
-            <strong>Clean</strong><small>Logo + @perfil</small>
-          </button>
-          <button class="template" data-template="top">
-            <div class="mini top-mini"><span>FITNAMENTE</span><i>SEU VÍDEO</i></div>
-            <strong>Top</strong><small>Faixa superior</small>
-          </button>
-        </div>
+<h2 class="settings-title">3. Ajustes</h2>
+<label>Enquadramento do vídeo<select id="fit"><option value="cover">Preencher a área</option><option value="contain">Mostrar vídeo inteiro</option></select></label>
+<label>Qualidade<select id="quality"><option value="high">Alta</option><option value="normal">Normal</option></select></label>
+<button id="generate" class="primary">GERAR TODOS OS VÍDEOS</button>
+<div id="status"></div>
+</div>
+</section>
 
-        <div class="field">
-          <label for="handle">@ do perfil</label>
-          <input id="handle" value="@fitnamente" maxlength="40">
-        </div>
-        <div class="field">
-          <label for="title">Texto opcional no topo</label>
-          <input id="title" placeholder="Ex.: 3 hábitos que ajudam no emagrecimento" maxlength="80">
-        </div>
-        <div class="field">
-          <label for="fit">Enquadramento</label>
-          <select id="fit">
-            <option value="cover">Preencher tela</option>
-            <option value="contain">Mostrar vídeo inteiro</option>
-          </select>
-        </div>
-
-        <button id="generate" class="primary">Gerar vídeos</button>
-        <div class="status" id="status" aria-live="polite"></div>
-      </div>
-    </section>
-
-    <section class="panel preview-panel">
-      <div class="panel-head"><h2>3. Pré-visualização</h2><span id="previewName">Nenhum vídeo</span></div>
-      <div class="preview-wrap">
-        <video id="preview" controls playsinline></video>
-        <div class="preview-overlay">
-          <div class="preview-brand">FITNAMENTE</div>
-          <div class="preview-title" id="previewTitle"></div>
-          <div class="preview-handle" id="previewHandle">@fitnamente</div>
-        </div>
-      </div>
-    </section>
-
-    <section id="outputs" class="panel outputs hidden">
-      <div class="panel-head"><h2>Vídeos gerados</h2><button id="clearOutputs" class="ghost">Limpar</button></div>
-      <div id="outputList"></div>
-    </section>
-
-    <section id="como-usar" class="how">
-      <h2>Como usar</h2>
-      <ol>
-        <li>Adicione um ou vários vídeos.</li>
-        <li>Escolha o template e personalize o @perfil.</li>
-        <li>Confira a prévia e clique em <b>Gerar vídeos</b>.</li>
-        <li>Baixe os arquivos individualmente.</li>
-      </ol>
-      <p><b>Importante:</b> esta versão usa APIs do navegador. A exportação com composição visual funciona melhor em navegadores Chromium recentes e depende dos formatos suportados pelo seu dispositivo.</p>
-    </section>
-  </main>
-
-  <footer>Fitnamente Studio • processamento local no navegador</footer>
-  <script src="script.js"></script>
-</body>
-</html>
+<section class="panel preview-panel">
+<h2>Pré-visualização</h2>
+<div class="preview-area"><canvas id="canvas"></canvas></div>
+</section>
+<section id="results" class="panel results hidden"><h2>Arquivos gerados</h2><div id="resultList"></div></section>
+</main>
+<footer>Fitnamente Studio • seus arquivos são processados no navegador</footer>
+<script src="script.js"></script>
+</body></html>
