@@ -1,69 +1,148 @@
-import {FFmpeg} from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js";
-import {fetchFile,toBlobURL} from "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js";
-const $=s=>document.querySelector(s),art=$("#art"),stage=$("#stage"),box=$("#box"),canvas=$("#canvas"),ctx=canvas.getContext("2d");
-let vids=[],template=null,ffmpeg=null,loaded=false,drag=false,resize=false,sx=0,sy=0,start={};
-const esc=s=>s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function render(){list.innerHTML="";vids.forEach((f,i)=>{let d=document.createElement("div");d.className="file";d.innerHTML=`<b>${esc(f.name)}</b><small>${Math.round(f.size/1024/1024*10)/10} MB</small><button>×</button>`;d.querySelector("button").onclick=()=>{vids.splice(i,1);render();state()};list.append(d)})}
-function state(){$("#generate").disabled=!(loaded&&template&&vids.length)}
-$("#template").onchange=()=>{template=$("#template").files[0];if(!template)return;art.src=URL.createObjectURL(template);art.onload=()=>{draw();state()};};
-$("#videos").onchange=()=>{vids=[...vids,...$("#videos").files].slice(0,50);render();draw();state();$("#videos").value=""};
-function point(e){let r=stage.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
-box.onpointerdown=e=>{let p=point(e),r=box.getBoundingClientRect(),sr=stage.getBoundingClientRect();resize=p.x>(r.right-sr.left-30)&&p.y>(r.bottom-sr.top-30);drag=!resize;sx=p.x;sy=p.y;start={l:box.offsetLeft,t:box.offsetTop,w:box.offsetWidth,h:box.offsetHeight};box.setPointerCapture(e.pointerId);e.preventDefault()};
-box.onpointermove=e=>{if(!drag&&!resize)return;let p=point(e),dx=p.x-sx,dy=p.y-sy;if(drag){box.style.left=Math.max(0,Math.min(stage.clientWidth-start.w,start.l+dx))+"px";box.style.top=Math.max(0,Math.min(stage.clientHeight-start.h,start.t+dy))+"px"}else{box.style.width=Math.max(50,Math.min(stage.clientWidth-start.l,start.w+dx))+"px";box.style.height=Math.max(50,Math.min(stage.clientHeight-start.t,start.h+dy))+"px"}draw()};
-box.onpointerup=()=>drag=resize=false;
-$("#center").onclick=()=>{box.style.left=(stage.clientWidth-box.offsetWidth)/2+"px";box.style.top=(stage.clientHeight-box.offsetHeight)/2+"px";draw()};
-$("#width").onclick=()=>{box.style.left="5%";box.style.width="90%";box.style.top="30%";box.style.height="40%";draw()};
-function coords(){let sr=stage.getBoundingClientRect(),r=box.getBoundingClientRect();return{x:Math.round((r.left-sr.left)/sr.width*1080),y:Math.round((r.top-sr.top)/sr.height*1920),w:Math.round(r.width/sr.width*1080),h:Math.round(r.height/sr.height*1920)}}
-function draw(){canvas.width=1080;canvas.height=1920;ctx.fillStyle="#111";ctx.fillRect(0,0,1080,1920);if(art.complete&&art.naturalWidth)ctx.drawImage(art,0,0,1080,1920);if(vids.length){let v=document.createElement("video");v.src=URL.createObjectURL(vids[0]);v.muted=true;v.onloadedmetadata=()=>{let c=coords(),vw=v.videoWidth,vh=v.videoHeight,s=$("#fit").value==="contain"?Math.min(c.w/vw,c.h/vh):Math.max(c.w/vw,c.h/vh),dw=vw*s,dh=vh*s;ctx.save();ctx.beginPath();ctx.rect(c.x,c.y,c.w,c.h);ctx.clip();ctx.drawImage(v,c.x+(c.w-dw)/2,c.y+(c.h-dh)/2,dw,dh);ctx.restore();URL.revokeObjectURL(v.src)}}}
-$("#fit").onchange=draw;
+import {FFmpegLocal} from "./vendor/ffmpeg-local.js";
 
-async function loadEngine(){
-  if(loaded)return;
-  $("#status").textContent="Carregando motor MP4…";
-  const bases=[
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd",
-    "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd"
-  ];
-  let lastError;
-  for(const base of bases){
-    try{
-      ffmpeg=new FFmpeg();
-      ffmpeg.on("log",({message})=>{if(/frame=|time=|speed=/.test(message))$("#status").textContent=message});
-      $("#status").textContent="Conectando ao motor MP4…";
-      const workerURL=await toBlobURL(
-        "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/worker.js",
-        "text/javascript"
-      );
-      await ffmpeg.load({
-        coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,"text/javascript"),
-        wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,"application/wasm"),
-        workerURL
-      });
-      loaded=true;
-      $("#load").textContent="MOTOR MP4 CARREGADO";
-      $("#status").textContent="Pronto.";
-      state();
-      return;
-    }catch(e){
-      lastError=e;
-      console.error("Falha ao carregar FFmpeg em",base,e);
-      try{ffmpeg?.terminate()}catch{}
-    }
-  }
-  throw lastError || new Error("Não foi possível carregar o FFmpeg");
-}
-$("#load").onclick=()=>loadEngine().catch(e=>{
-  console.error(e);
-  $("#status").textContent="Não consegui iniciar o motor MP4. Recarregue a página e tente novamente.";
+const $=id=>document.getElementById(id);
+const templateInput=$("templateInput"), videoInput=$("videoInput"), templateImage=$("templateImage");
+const stage=$("stage"), videoBox=$("videoBox"), videoList=$("videoList");
+const loadBtn=$("loadBtn"), generateBtn=$("generateBtn"), status=$("status"), progressBar=$("progressBar"), results=$("results");
+let videos=[], templateFile=null, ffmpeg=null, loaded=false, dragging=false, resizing=false, dragStart=null, boxStart=null;
+
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function setStatus(t,cls=""){status.className="status "+cls;status.textContent=t}
+function fmt(n){return (n/1024/1024).toFixed(1)+" MB"}
+
+templateInput.addEventListener("change",()=>{
+  templateFile=templateInput.files?.[0]||null;
+  if(!templateFile)return;
+  templateImage.src=URL.createObjectURL(templateFile);
+  templateImage.onload=()=>{templateImage.style.display="block";videoBox.style.display="block";setStatus("Template carregado. Ajuste a área do vídeo.");};
 });
+videoInput.addEventListener("change",()=>{
+  for(const f of videoInput.files||[]) videos.push(f);
+  videoInput.value="";
+  renderVideos();
+  updateGenerate();
+});
+function renderVideos(){
+  videoList.innerHTML="";
+  videos.forEach((f,i)=>{
+    const row=document.createElement("div");row.className="video-item";
+    row.innerHTML=`<span class="name" title="${f.name}">${f.name}</span><span class="size">${fmt(f.size)}</span><button class="remove" title="Remover">×</button>`;
+    row.querySelector("button").onclick=()=>{videos.splice(i,1);renderVideos();updateGenerate()};
+    videoList.appendChild(row);
+  });
+}
+function updateGenerate(){generateBtn.disabled=!(loaded&&templateFile&&videos.length);generateBtn.classList.toggle("disabled",generateBtn.disabled)}
+function boxNorm(){
+  const sw=stage.clientWidth,sh=stage.clientHeight;
+  return {x:videoBox.offsetLeft/sw,y:videoBox.offsetTop/sh,w:videoBox.offsetWidth/sw,h:videoBox.offsetHeight/sh};
+}
+function setBox(n){
+  const sw=stage.clientWidth,sh=stage.clientHeight;
+  const w=clamp(n.w,.05,.98),h=clamp(n.h,.05,.9);
+  const x=clamp(n.x,0,1-w),y=clamp(n.y,0,1-h);
+  videoBox.style.left=(x*100)+"%";videoBox.style.top=(y*100)+"%";videoBox.style.width=(w*100)+"%";videoBox.style.height=(h*100)+"%";
+}
+$("centerBtn").onclick=()=>{const n=boxNorm();n.x=(1-n.w)/2;n.y=(1-n.h)/2;setBox(n)};
+$("widthBtn").onclick=()=>{const n=boxNorm();n.w=.8;n.x=.1;setBox(n)};
 
-async function transparentTemplate(){let c=document.createElement("canvas"),w=art.naturalWidth,h=art.naturalHeight;c.width=w;c.height=h;let x=c.getContext("2d");x.drawImage(art,0,0,w,h);let sr=stage.getBoundingClientRect(),r=box.getBoundingClientRect();x.clearRect((r.left-sr.left)/sr.width*w,(r.top-sr.top)/sr.height*h,r.width/sr.width*w,r.height/sr.height*h);return await new Promise(r=>c.toBlob(r,"image/png"))}
-function ext(n){let m=n.toLowerCase();return m.endsWith(".mov")?"mov":m.endsWith(".webm")?"webm":m.endsWith(".mkv")?"mkv":"mp4"}
+videoBox.addEventListener("pointerdown",e=>{
+  e.preventDefault();videoBox.setPointerCapture(e.pointerId);
+  const r=stage.getBoundingClientRect(), b=videoBox.getBoundingClientRect();
+  const handle=e.clientX>b.right-18&&e.clientY>b.bottom-18;
+  dragging=!handle;resizing=handle;
+  dragStart={x:e.clientX,y:e.clientY};boxStart=boxNorm();
+});
+videoBox.addEventListener("pointermove",e=>{
+  if(!dragging&&!resizing)return;
+  const r=stage.getBoundingClientRect(),dx=(e.clientX-dragStart.x)/r.width,dy=(e.clientY-dragStart.y)/r.height;
+  const n={...boxStart};
+  if(dragging){n.x+=dx;n.y+=dy}
+  if(resizing){n.w+=dx;n.h+=dy}
+  setBox(n);
+});
+videoBox.addEventListener("pointerup",()=>{dragging=false;resizing=false});
 
-async function makeMP4(file,png,i){let input=`in${i}.${ext(file)}`,tpl=`tpl${i}.png`,out=`out${i}.mp4`;await ffmpeg.writeFile(input,await fetchFile(file));await ffmpeg.writeFile(tpl,await fetchFile(png));let c=coords(),vf;
-if($("#fit").value==="contain")vf=`scale=${c.w}:${c.h}:force_original_aspect_ratio=decrease,pad=${c.w}:${c.h}:(ow-iw)/2:(oh-ih)/2:color=black,pad=1080:1920:${c.x}:${c.y}:color=black`;
-else vf=`scale=${c.w}:${c.h}:force_original_aspect_ratio=increase,crop=${c.w}:${c.h},pad=1080:1920:${c.x}:${c.y}:color=black`;
-await ffmpeg.exec(["-i",input,"-i",tpl,"-filter_complex",`[0:v]${vf}[v];[v][1:v]overlay=0:0:format=auto[outv]`,"-map","[outv]","-map","0:a?","-c:v","libx264","-preset","veryfast","-crf",$("#quality").value==="high"?"19":"23","-pix_fmt","yuv420p","-c:a","aac","-b:a","128k","-movflags","+faststart","-shortest",out]);let data=await ffmpeg.readFile(out);for(let f of [input,tpl,out])try{await ffmpeg.deleteFile(f)}catch{}return new Blob([data.buffer],{type:"video/mp4"})}
+async function blobURL(url,type){
+  const r=await fetch(url,{mode:"cors"});
+  if(!r.ok)throw new Error("HTTP "+r.status+" ao baixar "+url);
+  const b=await r.blob();
+  return URL.createObjectURL(new Blob([b],{type}));
+}
+async function firstBlob(urls,type){
+  let last;
+  for(const u of urls){try{return await blobURL(u,type)}catch(e){last=e}}
+  throw last||new Error("Não foi possível baixar o arquivo.");
+}
 
-$("#generate").onclick=async()=>{if(!loaded||!template||!vids.length)return;$("#generate").disabled=true;$("#results").classList.remove("hidden");$("#out").innerHTML="";try{let png=await transparentTemplate();for(let i=0;i<vids.length;i++){$("#status").textContent=`Gerando MP4 ${i+1} de ${vids.length}…`;$("#bar").style.width=`${i/vids.length*100}%`;let b=await makeMP4(vids[i],png,i),u=URL.createObjectURL(b),name=vids[i].name.replace(/\.[^.]+$/,"")+"_fitnamente.mp4",d=document.createElement("div");d.className="result";d.innerHTML=`<b>${esc(name)}</b><a href="${u}" download="${esc(name)}">BAIXAR MP4</a>`;$("#out").append(d)}$("#bar").style.width="100%";$("#status").textContent="Concluído. MP4 pronto para postar."}catch(e){console.error(e);$("#status").textContent="Erro ao gerar. Tente um vídeo menor e recarregue a página."}$("#generate").disabled=false};
-draw();state();
+loadBtn.onclick=async()=>{
+  if(loaded)return;
+  loadBtn.disabled=true;loadBtn.textContent="CARREGANDO...";
+  setStatus("Baixando o motor MP4 (~31 MB)...");
+  try{
+    const coreJS=await firstBlob([
+      "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js",
+      "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js"
+    ],"text/javascript");
+    const wasm=await firstBlob([
+      "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm",
+      "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm"
+    ],"application/wasm");
+    ffmpeg=new FFmpegLocal("./vendor/worker.js");
+    ffmpeg.on("log",m=>{if(typeof m==="string"&&m) setStatus(m)});
+    ffmpeg.on("progress",p=>{if(p?.progress>=0)progressBar.style.width=Math.min(100,p.progress*100)+"%"});
+    await ffmpeg.load({coreURL:coreJS,wasmURL:wasm});
+    loaded=true;loadBtn.textContent="MOTOR MP4 CARREGADO";setStatus("Motor MP4 carregado com sucesso.","ok");updateGenerate();
+  }catch(e){
+    console.error(e);loadBtn.disabled=false;loadBtn.textContent="CARREGAR MOTOR MP4";
+    setStatus("Falha ao carregar o motor: "+(e?.message||e),"err");
+  }
+};
+
+function makeTransparentTemplate(){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();img.onload=()=>{
+      const c=document.createElement("canvas");c.width=1080;c.height=1920;
+      const ctx=c.getContext("2d");ctx.drawImage(img,0,0,1080,1920);
+      const n=boxNorm(),x=Math.round(n.x*1080),y=Math.round(n.y*1920),w=Math.round(n.w*1080),h=Math.round(n.h*1920);
+      ctx.clearRect(x,y,w,h);
+      c.toBlob(b=>b?resolve({blob:b,x,y,w,h}):reject(new Error("Falha ao criar template transparente")),"image/png");
+    };img.onerror=()=>reject(new Error("Não foi possível ler o template"));img.src=URL.createObjectURL(templateFile);
+  });
+}
+const fetchBytes=async f=>new Uint8Array(await f.arrayBuffer());
+
+generateBtn.onclick=async()=>{
+  if(!loaded||!templateFile||!videos.length)return;
+  generateBtn.disabled=true;results.innerHTML="";progressBar.style.width="0%";
+  try{
+    const t=await makeTransparentTemplate();
+    await ffmpeg.writeFile("template.png",await fetchBytes(t.blob));
+    const n=boxNorm(),W=1080,H=1920;
+    const q=$("quality").value;
+    for(let i=0;i<videos.length;i++){
+      const f=videos[i], input=`input_${i}.mp4`, output=`fitnamente_${String(i+1).padStart(2,"0")}.mp4`;
+      setStatus(`Processando ${i+1}/${videos.length}: ${f.name}`);
+      await ffmpeg.writeFile(input,await fetchBytes(f));
+      const x=Math.round(n.x*W),y=Math.round(n.y*H),w=Math.round(n.w*W),h=Math.round(n.h*H);
+      const vf=$("fitMode").value==="cover"
+        ? `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},pad=${W}:${H}:${x}:${y}:color=black[bg]`
+        : `[0:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,pad=${W}:${H}:${x}:${y}:color=black[bg]`;
+      const crf=q==="high"?"18":"23";
+      const args=["-i",input,"-i","template.png","-filter_complex",vf+"[bg][1:v]overlay=0:0:format=auto[v]","-map","[v]","-map","0:a?","-c:v","libx264","-preset","veryfast","-crf",crf,"-pix_fmt","yuv420p","-c:a","aac","-b:a","128k","-movflags","+faststart","-r","30","-shortest",output];
+      await ffmpeg.exec(args);
+      const data=await ffmpeg.readFile(output);
+      const blob=new Blob([data.buffer],{type:"video/mp4"});
+      const url=URL.createObjectURL(blob);
+      const div=document.createElement("div");div.className="result";
+      div.innerHTML=`<strong>${f.name}</strong><br><span class="ok">MP4 pronto</span>`;
+      const a=document.createElement("a");a.href=url;a.download=output;
+      const b=document.createElement("button");b.textContent="BAIXAR MP4";b.onclick=()=>a.click();
+      div.appendChild(b);results.appendChild(div);
+      progressBar.style.width=((i+1)/videos.length*100)+"%";
+      await ffmpeg.deleteFile(input);await ffmpeg.deleteFile(output);
+    }
+    setStatus("Todos os MP4 foram gerados.","ok");
+  }catch(e){
+    console.error(e);setStatus("Erro durante a geração: "+(e?.message||e),"err");
+  }finally{updateGenerate()}
+};

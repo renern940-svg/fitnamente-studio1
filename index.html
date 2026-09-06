@@ -1,7 +1,77 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fitnamente Studio MP4</title><link rel="stylesheet" href="style.css"></head><body>
-<header><b>FITNAMENTE <small>STUDIO</small></b><span>MP4 • 1080×1920</span></header><main>
-<section class="intro"><small>EDITOR DE TEMPLATES</small><h1>Coloque qualquer vídeo dentro do seu template.</h1><p>Envie sua arte, marque a área do vídeo e gere MP4 prontos para Reels.</p></section>
-<section class="grid"><div class="panel"><h2>1. Template</h2><label class="upload"><input id="template" type="file" accept="image/png,image/jpeg,image/webp"><strong>＋ Enviar template</strong><span>PNG, JPG ou WebP</span></label><div class="stagewrap"><div id="stage"><img id="art"><div id="box"><span>ÁREA DO VÍDEO</span><i></i></div></div></div><div class="buttons"><button id="center">Centralizar</button><button id="width">Ajustar largura</button></div><p class="tip">Arraste o quadro. Use o ponto no canto para redimensionar. Essa área ficará transparente e receberá o vídeo.</p></div>
-<div class="panel"><h2>2. Vídeos</h2><label class="upload"><input id="videos" type="file" accept="video/*" multiple><strong>＋ Adicionar vídeos</strong><span>Selecione vários de uma vez</span></label><div id="list"></div><h2 class="mt">3. Exportação</h2><label>Enquadramento<select id="fit"><option value="cover">Preencher a área</option><option value="contain">Mostrar vídeo inteiro</option></select></label><label>Qualidade<select id="quality"><option value="high">Alta</option><option value="normal">Normal / mais rápido</option></select></label><button id="load" class="secondary">CARREGAR MOTOR MP4</button><button id="generate" class="primary" disabled>GERAR MP4</button><div class="progress"><div id="bar"></div></div><div id="status"></div></div></section>
-<section class="panel preview"><h2>Pré-visualização</h2><canvas id="canvas"></canvas></section><section id="results" class="panel hidden"><h2>MP4 prontos</h2><div id="out"></div></section>
-<p class="note"><b>Processamento local:</b> o FFmpeg WebAssembly roda no navegador. O primeiro carregamento do motor MP4 é grande.</p></main><footer>Fitnamente Studio • processamento local</footer><script type="module" src="script.js"></script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fitnamente Studio</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <header>
+    <div class="eyebrow">EDITOR DE TEMPLATES</div>
+    <h1>Coloque qualquer vídeo dentro do seu template.</h1>
+    <p>Envie sua arte, marque a área do vídeo e gere MP4 prontos para Reels.</p>
+  </header>
+
+  <section class="grid">
+    <div class="card">
+      <h2>1. Template</h2>
+      <label class="drop" for="templateInput">
+        <strong>＋ Enviar template</strong>
+        <small>PNG, JPG ou WebP</small>
+      </label>
+      <input id="templateInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+
+      <div class="stage-wrap">
+        <div id="stage" class="stage">
+          <img id="templateImage" alt="">
+          <div id="videoBox" class="video-box">
+            <span>ÁREA DO VÍDEO</span>
+            <i></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="centerBtn" type="button">Centralizar</button>
+        <button id="widthBtn" type="button">Ajustar largura</button>
+      </div>
+      <p class="hint">Arraste o quadro. Use o ponto no canto para redimensionar. Essa área ficará transparente e receberá o vídeo.</p>
+    </div>
+
+    <div class="card">
+      <h2>2. Vídeos</h2>
+      <label class="drop" for="videoInput">
+        <strong>＋ Adicionar vídeos</strong>
+        <small>Selecione vários de uma vez</small>
+      </label>
+      <input id="videoInput" type="file" accept="video/*" multiple hidden>
+      <div id="videoList" class="video-list"></div>
+
+      <h2 class="section-title">3. Exportação</h2>
+
+      <label class="field-label">Enquadramento</label>
+      <select id="fitMode">
+        <option value="cover">Preencher a área</option>
+        <option value="contain">Mostrar vídeo inteiro</option>
+      </select>
+
+      <label class="field-label">Qualidade</label>
+      <select id="quality">
+        <option value="high">Alta</option>
+        <option value="normal">Normal / mais rápido</option>
+      </select>
+
+      <button id="loadBtn" class="main-btn" type="button">CARREGAR MOTOR MP4</button>
+      <button id="generateBtn" class="main-btn disabled" type="button" disabled>GERAR MP4</button>
+
+      <div class="progress"><div id="progressBar"></div></div>
+      <div id="status" class="status">O motor MP4 ainda não foi carregado.</div>
+      <div id="results"></div>
+    </div>
+  </section>
+</main>
+<script type="module" src="script.js"></script>
+</body>
+</html>
