@@ -30,9 +30,14 @@ async function loadEngine(){
       ffmpeg=new FFmpeg();
       ffmpeg.on("log",({message})=>{if(/frame=|time=|speed=/.test(message))$("#status").textContent=message});
       $("#status").textContent="Conectando ao motor MP4…";
+      const workerURL=await toBlobURL(
+        "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/worker.js",
+        "text/javascript"
+      );
       await ffmpeg.load({
         coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,"text/javascript"),
-        wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,"application/wasm")
+        wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,"application/wasm"),
+        workerURL
       });
       loaded=true;
       $("#load").textContent="MOTOR MP4 CARREGADO";
@@ -49,7 +54,7 @@ async function loadEngine(){
 }
 $("#load").onclick=()=>loadEngine().catch(e=>{
   console.error(e);
-  $("#status").textContent="O motor MP4 não conseguiu carregar. Tente Ctrl+F5 e clique novamente. Se continuar, o bloqueio é do navegador/rede, não do template.";
+  $("#status").textContent="Não consegui iniciar o motor MP4. Recarregue a página e tente novamente.";
 });
 
 async function transparentTemplate(){let c=document.createElement("canvas"),w=art.naturalWidth,h=art.naturalHeight;c.width=w;c.height=h;let x=c.getContext("2d");x.drawImage(art,0,0,w,h);let sr=stage.getBoundingClientRect(),r=box.getBoundingClientRect();x.clearRect((r.left-sr.left)/sr.width*w,(r.top-sr.top)/sr.height*h,r.width/sr.width*w,r.height/sr.height*h);return await new Promise(r=>c.toBlob(r,"image/png"))}
