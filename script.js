@@ -17,8 +17,40 @@ function coords(){let sr=stage.getBoundingClientRect(),r=box.getBoundingClientRe
 function draw(){canvas.width=1080;canvas.height=1920;ctx.fillStyle="#111";ctx.fillRect(0,0,1080,1920);if(art.complete&&art.naturalWidth)ctx.drawImage(art,0,0,1080,1920);if(vids.length){let v=document.createElement("video");v.src=URL.createObjectURL(vids[0]);v.muted=true;v.onloadedmetadata=()=>{let c=coords(),vw=v.videoWidth,vh=v.videoHeight,s=$("#fit").value==="contain"?Math.min(c.w/vw,c.h/vh):Math.max(c.w/vw,c.h/vh),dw=vw*s,dh=vh*s;ctx.save();ctx.beginPath();ctx.rect(c.x,c.y,c.w,c.h);ctx.clip();ctx.drawImage(v,c.x+(c.w-dw)/2,c.y+(c.h-dh)/2,dw,dh);ctx.restore();URL.revokeObjectURL(v.src)}}}
 $("#fit").onchange=draw;
 
-async function loadEngine(){if(loaded)return;$("#status").textContent="Carregando motor MP4 (~31 MB)…";ffmpeg=new FFmpeg();ffmpeg.on("log",({message})=>{if(/frame=|time=|speed=/.test(message))$("#status").textContent=message});let base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";await ffmpeg.load({coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,"text/javascript"),wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,"application/wasm")});loaded=true;$("#load").textContent="MOTOR MP4 CARREGADO";$("#status").textContent="Pronto.";state()}
-$("#load").onclick=()=>loadEngine().catch(e=>{$("#status").textContent="Não foi possível carregar o motor MP4. Atualize a página e tente novamente.";console.error(e)});
+async function loadEngine(){
+  if(loaded)return;
+  $("#status").textContent="Carregando motor MP4…";
+  const bases=[
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd",
+    "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd"
+  ];
+  let lastError;
+  for(const base of bases){
+    try{
+      ffmpeg=new FFmpeg();
+      ffmpeg.on("log",({message})=>{if(/frame=|time=|speed=/.test(message))$("#status").textContent=message});
+      $("#status").textContent="Conectando ao motor MP4…";
+      await ffmpeg.load({
+        coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,"text/javascript"),
+        wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,"application/wasm")
+      });
+      loaded=true;
+      $("#load").textContent="MOTOR MP4 CARREGADO";
+      $("#status").textContent="Pronto.";
+      state();
+      return;
+    }catch(e){
+      lastError=e;
+      console.error("Falha ao carregar FFmpeg em",base,e);
+      try{ffmpeg?.terminate()}catch{}
+    }
+  }
+  throw lastError || new Error("Não foi possível carregar o FFmpeg");
+}
+$("#load").onclick=()=>loadEngine().catch(e=>{
+  console.error(e);
+  $("#status").textContent="O motor MP4 não conseguiu carregar. Tente Ctrl+F5 e clique novamente. Se continuar, o bloqueio é do navegador/rede, não do template.";
+});
 
 async function transparentTemplate(){let c=document.createElement("canvas"),w=art.naturalWidth,h=art.naturalHeight;c.width=w;c.height=h;let x=c.getContext("2d");x.drawImage(art,0,0,w,h);let sr=stage.getBoundingClientRect(),r=box.getBoundingClientRect();x.clearRect((r.left-sr.left)/sr.width*w,(r.top-sr.top)/sr.height*h,r.width/sr.width*w,r.height/sr.height*h);return await new Promise(r=>c.toBlob(r,"image/png"))}
 function ext(n){let m=n.toLowerCase();return m.endsWith(".mov")?"mov":m.endsWith(".webm")?"webm":m.endsWith(".mkv")?"mkv":"mp4"}
